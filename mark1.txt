@@ -1,0 +1,284 @@
+below is the code for utils/pdf_parser.py
+
+from io import BytesIO
+import re
+import pandas as pd
+import pdfplumber
+
+
+def _to_fileobj(uploaded):
+    if hasattr(uploaded, "read"):
+        return BytesIO(uploaded.read())
+    return BytesIO(uploaded)
+
+
+def clean_description(desc: str) -> str:
+    desc = desc.upper()
+
+    remove_words = [
+        "APLPAY",
+        "PAY OVER TIME",
+        "SAN FRANCISCO",
+        "INTERNET CHARGE",
+        "FAIRFAX",
+        "HERNDON",
+        "CHANTILLY",
+        "NEW YORK",
+        "CA",
+        "VA",
+        "NY",
+    ]
+
+    for word in remove_words:
+        desc = desc.replace(word, " ")
+
+    desc = desc.replace("*", " ")
+    desc = desc.replace("/", " ")
+    desc = desc.replace("-", " ")
+
+    # remove long numeric store/order ids
+    desc = re.sub(r"\b\d+\b", " ", desc)
+
+    # normalize a few merchant variants
+    desc = desc.replace("APPLE COM BILL", "APPLE")
+    desc = desc.replace("APPLE.COM BILL", "APPLE")
+    desc = desc.replace("OPENAI CHATGPT SUBSCR", "OPENAI CHATGPT")
+    desc = desc.replace("PRIME VIDEO CHANNELS AMZN.COM BILL", "PRIME VIDEO")
+    desc = desc.replace("GMUBLAZEPIZZA", "BLAZE PIZZA")
+    desc = desc.replace("TST DESI CHOWRASTHA HE", "DESI CHOWRASTHA")
+    desc = desc.replace("TST LAYERED", "LAYERED")
+    desc = desc.replace("TST CHATEAU DE", "CHATEAU DE")
+    desc = desc.replace("MOBILE PAYMENT THANK YOU", "MOBILE PAYMENT")
+
+    desc = " ".join(desc.split())
+    return desc
+
+
+CATEGORY_MAP = {
+    "STARBUCKS": "Coffee",
+    "FOUNDATION COFFEE": "Coffee",
+    "SPOTIFY": "Subscription",
+    "OPENAI": "Subscription",
+    "CHATGPT": "Subscription",
+    "APPLE": "Subscription",
+    "PRIME": "Subscription",
+    "AMZN": "Subscription",
+    "DESI CHOWRASTHA": "Restaurant",
+    "BLAZE PIZZA": "Restaurant",
+    "PIZZA": "Restaurant",
+    "LAYERED": "Restaurant",
+    "CHATEAU": "Restaurant",
+    "HAAGEN": "Dessert",
+    "MOBILE PAYMENT": "Payment",
+}
+
+
+def categorize(desc: str) -> str:
+    for key, value in CATEGORY_MAP.items():
+        if key in desc:
+            return value
+    return "Other"
+
+
+def extract_transactions(pdf_file) -> pd.DataFrame:
+    fileobj = _to_fileobj(pdf_file)
+    rows = []
+
+    pattern = re.compile(
+        r"^(?P<date>\d{2}/\d{2}/\d{2})\*?\s+(?P<description>.+?)\s+(?P<amount>-?\$?\d+(?:,\d{3})*\.\d{2})$"
+    )
+
+    with pdfplumber.open(fileobj) as pdf:
+        for page in pdf.pages:
+            text = page.extract_text() or ""
+            for raw_line in text.splitlines():
+                line = re.sub(r"\s+", " ", raw_line).strip()
+                match = pattern.match(line)
+                if match:
+                    rows.append(
+                        {
+                            "date": match.group("date"),
+                            "description": match.group("description"),
+                            "amount": match.group("amount").replace("$", "").replace(",", ""),
+                        }
+                    )
+
+    df = pd.DataFrame(rows)
+
+    if df.empty:
+        return df
+
+    df["date"] = pd.to_datetime(df["date"], format="%m/%d/%y", errors="coerce")
+    df["amount"] = pd.to_numeric(df["amount"], errors="coerce")
+    df = df.dropna(subset=["date", "amount"]).reset_index(drop=True)
+
+    df["description_raw"] = df["description"]
+    df["description"] = df["description"].apply(clean_description)
+    df["category"] = df["description"].apply(categorize)
+
+    return df
+
+
+below is the code for app.py
+
+import streamlit as st
+import plotly.express as px
+from utils.pdf_parser import extract_transactions
+
+st.set_page_config(page_title="Finance Analytics", layout="wide")
+
+st.title("Personal Finance Analytics Dashboard")
+st.caption("Upload a bank statement PDF to extract transactions and generate spending insights.")
+
+pdf = st.file_uploader("Upload bank statement (PDF)", type=["pdf"])
+
+if pdf:
+    df = extract_transactions(pdf)
+
+    if df.empty:
+        st.warning("No transactions were extracted from this PDF.")
+    else:
+        st.success(f"Extracted {len(df)} transactions")
+
+        df = df.sort_values("date").reset_index(drop=True)
+
+        min_date = df["date"].min().date()
+        max_date = df["date"].max().date()
+
+        st.sidebar.header("Filters")
+
+        date_range = st.sidebar.date_input(
+            "Select date range",
+            value=(min_date, max_date),
+            min_value=min_date,
+            max_value=max_date,
+        )
+
+        category_options = sorted(df["category"].unique().tolist())
+        selected_categories = st.sidebar.multiselect(
+            "Filter by category",
+            options=category_options,
+            default=category_options,
+        )
+
+        merchant_search = st.sidebar.text_input("Search merchant")
+
+        filtered_df = df.copy()
+
+        if isinstance(date_range, tuple) and len(date_range) == 2:
+            start_date, end_date = date_range
+            filtered_df = filtered_df[
+                (filtered_df["date"].dt.date >= start_date) &
+                (filtered_df["date"].dt.date <= end_date)
+                ]
+
+        if selected_categories:
+            filtered_df = filtered_df[filtered_df["category"].isin(selected_categories)]
+
+        if merchant_search.strip():
+            filtered_df = filtered_df[
+                filtered_df["description"].str.contains(merchant_search.strip().upper(), na=False)
+            ]
+
+        if filtered_df.empty:
+            st.warning("No transactions match the selected filters.")
+            st.stop()
+
+        spending_df = filtered_df[filtered_df["amount"] > 0].copy()
+        payments_df = filtered_df[filtered_df["amount"] < 0].copy()
+
+        total_spend = spending_df["amount"].sum()
+        total_payments = payments_df["amount"].sum()
+        net_total = filtered_df["amount"].sum()
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Total Spending", f"${total_spend:.2f}")
+        c2.metric("Total Payments", f"${total_payments:.2f}")
+        c3.metric("Net Total", f"${net_total:.2f}")
+
+        csv_data = filtered_df.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            "Download filtered transactions as CSV",
+            data=csv_data,
+            file_name="filtered_transactions.csv",
+            mime="text/csv",
+        )
+
+        st.subheader("Transactions")
+        st.dataframe(
+            filtered_df[["date", "description", "category", "amount"]],
+            use_container_width=True,
+        )
+
+        filtered_df["month"] = filtered_df["date"].dt.to_period("M").astype(str)
+
+        monthly = (
+            spending_df.assign(month=spending_df["date"].dt.to_period("M").astype(str))
+            .groupby("month")["amount"]
+            .sum()
+            .reset_index()
+        )
+
+        st.subheader("Monthly Spending")
+        fig_monthly = px.bar(
+            monthly,
+            x="month",
+            y="amount",
+            title="Monthly Spend",
+        )
+        st.plotly_chart(fig_monthly, use_container_width=True)
+
+        merchants = (
+            spending_df.groupby("description")["amount"]
+            .sum()
+            .sort_values(ascending=False)
+            .head(10)
+            .reset_index()
+        )
+
+        st.subheader("Top Merchants")
+        fig_merchants = px.bar(
+            merchants,
+            x="amount",
+            y="description",
+            orientation="h",
+            title="Top Merchants",
+        )
+        fig_merchants.update_layout(yaxis={"categoryorder": "total ascending"})
+        st.plotly_chart(fig_merchants, use_container_width=True)
+
+        category_df = (
+            spending_df.groupby("category")["amount"]
+            .sum()
+            .reset_index()
+            .sort_values("amount", ascending=False)
+        )
+
+        st.subheader("Spending by Category")
+        fig_category = px.pie(
+            category_df,
+            names="category",
+            values="amount",
+            title="Category Distribution",
+        )
+        st.plotly_chart(fig_category, use_container_width=True)
+
+        st.subheader("Quick Insights")
+
+        top_category = category_df.iloc[0]["category"] if not category_df.empty else "N/A"
+        top_category_amount = category_df.iloc[0]["amount"] if not category_df.empty else 0
+        avg_spend = spending_df["amount"].mean() if not spending_df.empty else 0
+        largest_txn = spending_df["amount"].max() if not spending_df.empty else 0
+        largest_txn_merchant = (
+            spending_df.loc[spending_df["amount"].idxmax(), "description"]
+            if not spending_df.empty else "N/A"
+        )
+
+        st.write(f"• Biggest spending category: **{top_category}** (${top_category_amount:.2f})")
+        st.write(f"• Average transaction amount: **${avg_spend:.2f}**")
+        st.write(f"• Largest transaction: **${largest_txn:.2f}** at **{largest_txn_merchant}**")
+        st.write(f"• Number of payment transactions detected: **{len(payments_df)}**")
+        st.write(f"• Number of spending transactions detected: **{len(spending_df)}**")
+
+else:
+    st.info("Upload a PDF to start analysis")
