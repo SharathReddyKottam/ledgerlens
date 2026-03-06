@@ -1,51 +1,56 @@
 # LedgerLens
 
-LedgerLens — Multi-Bank Statement Analytics Platform
+**LedgerLens — Multi-Bank Statement Analytics Platform**
 
-LedgerLens is a Python-based financial analytics platform that extracts and analyzes transactions from bank and credit card statement PDFs. The system automatically detects the bank, parses the statement format, normalizes transactions into a unified dataset, and generates interactive spending insights.
+LedgerLens is a Python-based financial analytics platform that extracts and analyzes transactions from bank and credit card statement PDFs.
 
----
-
-## Features
-
-• Multi-bank statement parsing (AMEX, Chase, Bank of America)  
-• Automatic bank detection from PDF statements  
-• Transaction extraction and normalization  
-• Interactive analytics dashboard built with Streamlit  
-• Spending insights by category, merchant, and time  
-• CSV export of parsed and filtered transactions  
-• Debug mode with parser diagnostics and raw match preview  
-• Support for multiple statement uploads
+The system automatically detects the bank, parses the statement format, normalizes transactions into a unified dataset, and generates interactive spending insights.
 
 ---
 
-## Project Architecture
+# Features
 
-PDF Statement  
-↓  
-Bank Detection  
-↓  
-Bank-Specific Parser  
-↓  
-Transaction Normalization  
-↓  
+- Multi-bank statement parsing (AMEX, Chase, Bank of America)
+- Automatic bank detection from PDF statements
+- Transaction extraction and normalization
+- Interactive analytics dashboard built with Streamlit
+- Spending insights by category, merchant, and time
+- CSV export of parsed and filtered transactions
+- Debug mode with parser diagnostics and raw match preview
+- Support for multiple statement uploads
+
+---
+
+# Project Architecture
+
+```
+PDF Statement
+      ↓
+Bank Detection
+      ↓
+Bank-Specific Parser
+      ↓
+Transaction Normalization
+      ↓
 Analytics Dashboard
+```
 
 ---
 
-## Tech Stack
+# Tech Stack
 
-Python  
-Streamlit  
-Pandas  
-Plotly  
-pdfplumber  
-python-dateutil
+- Python
+- Streamlit
+- Pandas
+- Plotly
+- pdfplumber
+- python-dateutil
 
 ---
 
-## Repository Structure
+# Repository Structure
 
+```
 ledgerlens
 │
 ├── app.py
@@ -63,76 +68,93 @@ ledgerlens
 │   └── dashboard.png
 │
 └── sample_statements
-└── demo_files.pdf
+    └── demo_files.pdf
+```
 
 ---
 
-## Installation
+# Installation
 
-Clone the repository
+### Clone the repository
 
+```
 git clone https://github.com/SharathReddyKottam/ledgerlens.git
+```
 
-Move into the project folder
+### Move into the project folder
 
+```
 cd ledgerlens
+```
 
-Create a virtual environment
+### Create a virtual environment
 
+```
 python -m venv .venv
+```
 
-Activate it
+### Activate the environment
 
 Mac / Linux
 
+```
 source .venv/bin/activate
+```
 
 Windows
 
+```
 .venv\Scripts\activate
+```
 
-Install dependencies
+### Install dependencies
 
+```
 pip install -r requirements.txt
+```
 
 ---
 
-## Run the Dashboard
+# Run the Dashboard
 
 Start the Streamlit app
 
+```
 streamlit run app.py
+```
 
-Open the browser at
+Open your browser at
 
+```
 http://localhost:8501
+```
 
 Upload bank statement PDFs to begin analysis.
 
 ---
 
-## Example Insights
+# Example Insights
 
 LedgerLens can automatically generate:
 
-• Monthly spending trends  
-• Category-level expense distribution  
-• Merchant spending analysis  
-• Cross-bank spending comparison  
-• Transaction-level exports
+- Monthly spending trends
+- Category-level expense distribution
+- Merchant spending analysis
+- Cross-bank spending comparison
+- Transaction-level exports
 
 ---
 
-## Future Improvements
+# Future Improvements
 
-• Support for additional bank formats  
-• Machine learning based transaction categorization  
-• Automatic Gmail statement ingestion  
-• Financial anomaly detection  
-• Recurring expense identification
+- Support for additional bank formats
+- Machine learning based transaction categorization
+- Automatic Gmail statement ingestion
+- Financial anomaly detection
+- Recurring expense identification
 
 ---
 
-## License
+# License
 
 This project is open source and available under the MIT License.
