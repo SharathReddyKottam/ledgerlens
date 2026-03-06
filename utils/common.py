@@ -10,6 +10,7 @@ CATEGORY_MAP = {
     "OPENAI": "Subscription",
     "CHATGPT": "Subscription",
     "APPLE": "Subscription",
+    "APPLE CARD PAYMENT": "Payment",
     "PRIME": "Subscription",
     "AMZN": "Subscription",
     "NETFLIX": "Subscription",
@@ -23,7 +24,11 @@ CATEGORY_MAP = {
     "DOMINION ENERGY": "Utilities",
     "VIRGINIA NATURAL GAS": "Utilities",
     "ROBINHOOD": "Investment",
-    "BEST BUY": "Shopping",
+    "DIVIDEND": "Investment Income",
+    "INTEREST": "Interest",
+    "ACH DEPOSIT": "Transfer In",
+    "ACH WITHDRAWAL": "Transfer Out",
+    "CASH SWEEP": "Cash Movement",
     "AMERICAN EXPRESS": "Credit Card Payment",
     "AMERICANEXPRESS": "Credit Card Payment",
     "ZELLE PAYMENT FROM": "Transfer In",
@@ -32,6 +37,24 @@ CATEGORY_MAP = {
     "MONTHLY SERVICE FEE": "Bank Fee",
     "MOBILE PAYMENT": "Payment",
     "PAYMENT THANK YOU": "Payment",
+
+    # New Apple Card / Robinhood / merchant additions
+    "SHOTTED SPECIALTY": "Coffee",
+    "CAVA": "Restaurant",
+    "NANDOS": "Restaurant",
+    "HYDERABAD HOUSE": "Restaurant",
+    "INDIA BAZAAR": "Groceries",
+    "COSTCO": "Groceries",
+    "DOORDASH": "Food Delivery",
+    "PLAYSTATION": "Entertainment",
+    "HBO": "Subscription",
+    "ADOBE": "Subscription",
+    "AMAZON": "Shopping",
+    "AMAZON MKTPL": "Shopping",
+    "HERTZ": "Travel",
+    "FLAGSHIP CAR WASH": "Auto",
+    "E Z PASS": "Transport",
+    "MISCELLANEOUS CREDIT ADJ": "Credit Adjustment",
 }
 
 
@@ -86,6 +109,8 @@ def clean_description(desc: str) -> str:
         "ONLINE PAYMENT TO DOMINION ENERGY VIRGINIA": "DOMINION ENERGY",
         "AMERICANEXPRESS TRANSFER": "AMERICAN EXPRESS TRANSFER",
         "AMERICAN EXPRESS ACH PMT": "AMERICAN EXPRESS PAYMENT",
+        "DD DOORDASHDASHPASS DOORDASH.COM": "DOORDASH",
+        "ONLINE MOBILE PAYMENT": "ONLINE PAYMENT",
     }
 
     for old, new in replacements.items():

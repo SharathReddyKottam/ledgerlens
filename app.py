@@ -1,14 +1,35 @@
+import hashlib
 import streamlit as st
 import plotly.express as px
 import pandas as pd
 from utils.parser_router import extract_transactions
 
+
 st.set_page_config(page_title="LedgerLens", layout="wide")
 
 st.title("LedgerLens")
 st.caption(
-    "Upload bank or credit card statements to automatically extract, normalize, and analyze transactions across multiple financial institutions."
+    "Upload one or more credit card or bank statement PDFs to extract, normalize, and analyze transactions."
 )
+
+
+def build_statement_fingerprint(df: pd.DataFrame, bank: str):
+    """Create a fingerprint for an uploaded statement to detect duplicate statements."""
+    if df is None or df.empty:
+        return None
+
+    first_date = str(df["date"].min().date())
+    last_date = str(df["date"].max().date())
+    total_rows = str(len(df))
+    total_amount = f"{df['amount'].sum():.2f}"
+
+    sample_descriptions = "|".join(
+        df["description"].astype(str).head(5).tolist()
+    )
+
+    raw_key = f"{bank}|{first_date}|{last_date}|{total_rows}|{total_amount}|{sample_descriptions}"
+    return hashlib.md5(raw_key.encode()).hexdigest()
+
 
 st.sidebar.header("Controls")
 debug_mode = st.sidebar.checkbox("Debug mode", value=False)
@@ -23,6 +44,7 @@ if uploaded_files:
     all_dfs = []
     file_results = []
     debug_results = []
+    seen_statement_fingerprints = set()
 
     for uploaded_file in uploaded_files:
         result = extract_transactions(uploaded_file)
@@ -42,6 +64,17 @@ if uploaded_files:
                     "confidence": confidence,
                     "status": "Unsupported format",
                     "rows": 0,
+                }
+            )
+
+            debug_results.append(
+                {
+                    "file_name": uploaded_file.name,
+                    "bank": "UNKNOWN",
+                    "parser": parser_name,
+                    "confidence": confidence,
+                    "raw_rows": raw_rows,
+                    "clean_df": df,
                 }
             )
             continue
@@ -69,6 +102,34 @@ if uploaded_files:
                 }
             )
             continue
+
+        fingerprint = build_statement_fingerprint(df, bank)
+
+        if fingerprint in seen_statement_fingerprints:
+            file_results.append(
+                {
+                    "file_name": uploaded_file.name,
+                    "bank": bank.upper(),
+                    "parser": parser_name,
+                    "confidence": confidence,
+                    "status": "Duplicate statement skipped",
+                    "rows": 0,
+                }
+            )
+
+            debug_results.append(
+                {
+                    "file_name": uploaded_file.name,
+                    "bank": bank.upper(),
+                    "parser": parser_name,
+                    "confidence": confidence,
+                    "raw_rows": raw_rows,
+                    "clean_df": df,
+                }
+            )
+            continue
+
+        seen_statement_fingerprints.add(fingerprint)
 
         df = df.copy()
         df["source_file"] = uploaded_file.name
@@ -104,7 +165,9 @@ if uploaded_files:
         st.subheader("Debug Preview")
 
         for item in debug_results:
-            with st.expander(f"{item['file_name']} | {item['bank']} | {item['parser']} | Confidence: {item['confidence']}"):
+            with st.expander(
+                    f"{item['file_name']} | {item['bank']} | {item['parser']} | Confidence: {item['confidence']}"
+            ):
                 st.write(f"**Detected bank:** {item['bank']}")
                 st.write(f"**Parser used:** {item['parser']}")
                 st.write(f"**Parser confidence:** {item['confidence']}")
@@ -128,12 +191,15 @@ if uploaded_files:
     combined_df = pd.concat(all_dfs, ignore_index=True)
     combined_df = combined_df.sort_values("date").reset_index(drop=True)
 
+    # Remove duplicate transactions across uploaded statements
     combined_df = combined_df.drop_duplicates(
         subset=["date", "description", "amount", "bank"],
         keep="first"
     ).reset_index(drop=True)
 
-    st.success(f"Combined {len(combined_df)} transactions from {combined_df['source_file'].nunique()} file(s)")
+    st.success(
+        f"Combined {len(combined_df)} transactions from {combined_df['source_file'].nunique()} unique statement file(s)"
+    )
 
     st.sidebar.header("Filters")
 
@@ -180,7 +246,11 @@ if uploaded_files:
 
     if merchant_search.strip():
         filtered_df = filtered_df[
-            filtered_df["description"].str.contains(merchant_search.strip(), case=False, na=False)
+            filtered_df["description"].str.contains(
+                merchant_search.strip(),
+                case=False,
+                na=False
+            )
         ]
 
     if filtered_df.empty:
@@ -235,6 +305,7 @@ if uploaded_files:
     display_cols = ["date", "description", "category", "amount", "bank", "source_file"]
     if "account_type" in filtered_df.columns:
         display_cols.insert(4, "account_type")
+
     st.dataframe(filtered_df[display_cols], use_container_width=True)
 
     monthly = (

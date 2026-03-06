@@ -4,6 +4,8 @@ import pdfplumber
 from utils.amex_parser import extract_amex_transactions
 from utils.chase_parser import extract_chase_transactions
 from utils.boa_parser import extract_boa_transactions
+from utils.robinhood_parser import extract_robinhood_transactions
+from utils.applecard_parser import extract_applecard_transactions
 
 
 def detect_bank(pdf_file) -> str:
@@ -21,13 +23,19 @@ def detect_bank(pdf_file) -> str:
 
     text = first_page_text.upper()
 
+    if "APPLE CARD IS ISSUED BY GOLDMAN SACHS BANK USA" in text or "APPLE CARD CUSTOMER" in text:
+        return "applecard"
+
+    if "ROBINHOOD CREDIT CARD" in text or "CREDITCARDS@ROBINHOOD.COM" in text:
+        return "robinhood"
+
     if "JPMORGAN CHASE BANK" in text or "CHASE COLLEGE CHECKING" in text or "CHASE.COM" in text:
         return "chase"
 
     if "BANK OF AMERICA" in text:
         return "boa"
 
-    if "AMERICAN EXPRESS®" in text or "AMERICAN EXPRESS GOLD CARD" in text or "ACCOUNT ENDING" in text:
+    if "AMERICAN EXPRESS®" in text or "AMERICAN EXPRESS GOLD CARD" in text:
         return "amex"
 
     return "unknown"
@@ -42,6 +50,10 @@ def extract_transactions(pdf_file):
         return extract_chase_transactions(pdf_file)
     elif bank == "boa":
         return extract_boa_transactions(pdf_file)
+    elif bank == "robinhood":
+        return extract_robinhood_transactions(pdf_file)
+    elif bank == "applecard":
+        return extract_applecard_transactions(pdf_file)
     else:
         return {
             "bank": "unknown",
