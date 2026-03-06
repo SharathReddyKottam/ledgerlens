@@ -6,6 +6,9 @@ LedgerLens is a Python-based financial analytics platform that extracts and anal
 
 The system automatically detects the bank, parses the statement format, normalizes transactions into a unified dataset, and generates interactive spending insights.
 
+## Live Demo
+
+https://ledgerlens-analytics.streamlit.app
 ---
 
 # Features
